@@ -1,0 +1,55 @@
+import os, zipfile, textwrap
+base="/mnt/data/StudyMate"
+os.makedirs(base,exist_ok=True)
+files={
+"index.html":"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111827"><title>StudyMate</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="style.css"></head>
+<body><div class="app">
+<header><div><small>YOUR STUDY SPACE</small><h1>StudyMate <span>📚</span></h1></div><button id="themeBtn" aria-label="Toggle theme">☀️</button></header>
+<nav><button class="tab active" data-page="home">Home</button><button class="tab" data-page="tasks">Assignments</button><button class="tab" data-page="notes">Notes</button><button class="tab" data-page="read">Read</button></nav>
+<main id="main"></main><footer>Study smarter. One task at a time.</footer></div><script src="app.js"></script></body></html>""",
+"style.css":"""*{box-sizing:border-box} :root{--bg:#f4f6fb;--card:#fff;--text:#172033;--muted:#687386;--accent:#6558e8;--line:#e6e9f2}body.dark{--bg:#101522;--card:#1b2232;--text:#edf1fb;--muted:#aab4c7;--accent:#9b91ff;--line:#30394c}body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,sans-serif}.app{max-width:760px;margin:auto;padding:20px 16px 30px}header{display:flex;justify-content:space-between;align-items:center;margin:8px 0 22px}small{color:var(--muted);letter-spacing:2px;font-size:11px}h1{margin:4px 0;font-size:29px}button,input,textarea,select{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:11px 14px;background:var(--accent);color:white;font-weight:600}#themeBtn{background:var(--card);color:var(--text);border:1px solid var(--line)}nav{display:flex;gap:7px;overflow:auto;margin-bottom:20px}nav button{background:var(--card);color:var(--muted);border:1px solid var(--line);white-space:nowrap;padding:10px 13px}nav button.active{background:var(--accent);color:white;border-color:var(--accent)}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0}.muted{color:var(--muted)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.stat{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 10px}.stat strong{display:block;font-size:25px}.stat span{font-size:12px;color:var(--muted)}h2{font-size:21px;margin:8px 0 12px}h3{font-size:17px;margin:0 0 7px}.form{display:grid;gap:10px}.form input,.form textarea,.form select,.search{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg);color:var(--text)}textarea{min-height:130px;resize:vertical}.item{padding:13px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}.itemhead{display:flex;justify-content:space-between;gap:10px}.pill{font-size:12px;background:var(--bg);padding:5px 9px;border-radius:99px;color:var(--muted)}.actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}.actions button{font-size:12px;padding:7px 10px}.secondary{background:var(--bg);color:var(--text);border:1px solid var(--line)}.danger{background:#dc4c64}.empty{padding:25px;text-align:center;color:var(--muted)}footer{text-align:center;color:var(--muted);font-size:12px;margin:25px 0}.reading{line-height:1.9;font-size:19px;white-space:pre-wrap}.toprow{display:flex;justify-content:space-between;align-items:center;gap:8px}.toprow button{padding:8px 10px}@media(min-width:600px){.app{padding:28px}.stats{gap:14px}}""",
+"app.js":"""const $=s=>document.querySelector(s);let tasks=JSON.parse(localStorage.tasks||'[]'),notes=JSON.parse(localStorage.notes||'[]'),page='home',reading=null;
+if(localStorage.dark==='1')document.body.classList.add('dark');
+$('#themeBtn').onclick=()=>{document.body.classList.toggle('dark');localStorage.dark=document.body.classList.contains('dark')?'1':'0';$('#themeBtn').textContent=document.body.classList.contains('dark')?'☀️':'🌙'};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{page=b.dataset.page;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));render()});
+function save(){localStorage.tasks=JSON.stringify(tasks);localStorage.notes=JSON.stringify(notes);render()}
+function esc(s=''){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function taskForm(){return `<div class="card"><h2>＋ Add assignment</h2><form id="taskForm" class="form"><input name="title" placeholder="Assignment title" required><input name="subject" placeholder="Subject (e.g. Economics)" required><input name="due" type="date"><button>Add assignment</button></form></div>`}
+function noteForm(){return `<div class="card"><h2>＋ Add note</h2><form id="noteForm" class="form"><input name="title" placeholder="Note title" required><input name="subject" placeholder="Subject" required><textarea name="body" placeholder="Write or paste your class notes..." required></textarea><button>Save note</button></form></div>`}
+function taskList(){return tasks.length?tasks.map((t,i)=>`<div class="item"><div class="itemhead"><div><h3>${esc(t.title)}</h3><span class="muted">${esc(t.subject)} · ${t.due||'No deadline'}</span></div><span class="pill">${t.done?'Completed':'Pending'}</span></div><div class="actions"><button onclick="toggleTask(${i})">${t.done?'Undo':'Mark done'}</button><button class="secondary" onclick="deleteTask(${i})">Delete</button></div></div>`).join(''):'<div class="empty">No assignments yet. Add your first one above!</div>'}
+function noteList(){return notes.length?notes.map((n,i)=>`<div class="item"><div class="itemhead"><div><h3>${esc(n.title)}</h3><span class="muted">${esc(n.subject)} · ${n.date}</span></div></div><div class="actions"><button onclick="openNote(${i})">Read note</button><button class="secondary" onclick="editNote(${i})">Edit</button><button class="danger" onclick="deleteNote(${i})">Delete</button></div></div>`).join(''):'<div class="empty">No notes saved yet. Add your first note above!</div>'}
+window.toggleTask=i=>{tasks[i].done=!tasks[i].done;save()};window.deleteTask=i=>{if(confirm('Delete this assignment?')){tasks.splice(i,1);save()}};window.deleteNote=i=>{if(confirm('Delete this note?')){notes.splice(i,1);save()}};
+window.openNote=i=>{reading=i;page='read';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.page==='read'));render()};
+window.editNote=i=>{let n=notes[i],title=prompt('Note title',n.title);if(title===null)return;let body=prompt('Note text',n.body);if(body!==null){n.title=title;n.body=body;save()}};
+function render(){let m=$('#main');if(page==='home'){m.innerHTML=`<h2>Welcome back 👋</h2><p class="muted">Your learning, organized.</p><div class="stats"><div class="stat"><strong>${tasks.filter(t=>!t.done).length}</strong><span>Pending</span></div><div class="stat"><strong>${tasks.filter(t=>t.done).length}</strong><span>Completed</span></div><div class="stat"><strong>${notes.length}</strong><span>Saved notes</span></div></div><div class="card"><h2>Recent assignments</h2>${taskList()}</div><div class="card"><h2>Recent notes</h2>${noteList()}</div>`}
+if(page==='tasks'){m.innerHTML=taskForm()+`<div class="card"><h2>Your assignments</h2><input class="search" id="taskSearch" placeholder="Search assignments...">${taskList()}</div>`;$('#taskForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);tasks.unshift({title:f.get('title'),subject:f.get('subject'),due:f.get('due'),done:false});save()};$('#taskSearch').oninput=e=>{let q=e.target.value.toLowerCase();document.querySelectorAll('#main .item').forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?'':'none')}}
+if(page==='notes'){m.innerHTML=noteForm()+`<div class="card"><h2>Your notes</h2><input class="search" id="noteSearch" placeholder="Search notes...">${noteList()}</div>`;$('#noteForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);notes.unshift({title:f.get('title'),subject:f.get('subject'),body:f.get('body'),date:new Date().toLocaleDateString()});save()};$('#noteSearch').oninput=e=>{let q=e.target.value.toLowerCase();document.querySelectorAll('#main .item').forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?'':'none')}}
+if(page==='read'){let n=reading!==null?notes[reading]:null;m.innerHTML=n?`<div class="card"><div class="toprow"><span class="pill">${esc(n.subject)}</span><button class="secondary" onclick="reading=null;render()">All notes</button></div><h2>${esc(n.title)}</h2><div class="actions"><button class="secondary" onclick="font(-1)">A−</button><button class="secondary" onclick="font(1)">A+</button></div><article class="reading" id="article">${esc(n.body)}</article></div>`:`<div class="card"><h2>Reading mode</h2><p class="muted">Choose a note to read comfortably.</p>${noteList()}</div>`}}
+window.font=d=>{let a=$('#article');a.style.fontSize=(parseFloat(getComputedStyle(a).fontSize)+d*2)+'px'};
+render();"""
+,
+"manifest.json":"""{"name":"StudyMate Student","short_name":"StudyMate","start_url":"./index.html","display":"standalone","background_color":"#101522","theme_color":"#6558e8","description":"Assignments, notes and reading app"}""",
+"README.md":"""# StudyMate starter app
+A mobile-first student app built with HTML/CSS/JavaScript. Assignments and notes are saved in your browser/device using localStorage. It works offline after first load when hosted; this starter can be wrapped into an Android APK.
+
+## Phone-only path to APK
+1. Upload these files to a GitHub repository (create a repository named `studymate`).
+2. To make a web preview, enable GitHub Pages: Settings → Pages → Deploy from branch → `main` → `/ (root)`.
+3. For an APK, use a Capacitor Android wrapper and GitHub Actions build workflow. This needs Android SDK/Gradle in the GitHub runner; you do not need to install them on your phone.
+4. Install only APKs you built or trust. Android may ask permission to install from your browser/files app.
+
+## Current starter features
+- Assignment creation, completion and deletion
+- Notes create/edit/delete and search
+- Reading mode with font controls
+- Dark mode
+- Local storage
+"""
+}
+for name,content in files.items():
+    open(os.path.join(base,name),"w",encoding="utf-8").write(content)
+zip_path="/mnt/data/StudyMate_Starter.zip"
+with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
+    for name in files:z.write(os.path.join(base,name),f"StudyMate/{name}")
+print("Created starter project:",zip_path)
